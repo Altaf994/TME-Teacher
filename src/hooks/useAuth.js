@@ -23,15 +23,21 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
+    localStorage.removeItem(
+      process.env.REACT_APP_AUTH_TOKEN_KEY || 'access_token'
+    );
+    localStorage.removeItem(
+      process.env.REACT_APP_REFRESH_TOKEN_KEY || 'refresh_token'
+    );
     setUser(null);
     setError(null);
   }, []);
 
   const checkAuth = useCallback(async () => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem(
+        process.env.REACT_APP_AUTH_TOKEN_KEY || 'access_token'
+      );
       if (token) {
         // Skip the /auth/me call since this endpoint doesn't exist
         // Just set a basic user object if token exists
@@ -56,22 +62,39 @@ export const AuthProvider = ({ children }) => {
       setError(null);
 
       // Make API call to the login endpoint
-      const response = await apiService.post('/auth/login/', {
-        identifier: credentials.username || credentials.email, // Use identifier for backend compatibility
+      const response = await apiService.post('/auth/login', {
+        username: credentials.username,
         password: credentials.password,
       });
 
-      const { access_token, refresh_token, user: userData } = response.data;
+      const { token, teacherId } = response.data;
 
-      // Store tokens in localStorage with fixed keys
-      localStorage.setItem('access_token', access_token);
-      localStorage.setItem('refresh_token', refresh_token);
+      // Decode JWT token to get user information
+      const decodeJWT = token => {
+        try {
+          const payload = token.split('.')[1];
+          const decodedPayload = JSON.parse(atob(payload));
+          return decodedPayload;
+        } catch (error) {
+          console.error('Error decoding JWT:', error);
+          return null;
+        }
+      };
 
-      // Log tokens for confirmation
-      console.log('Access token stored:', access_token);
-      console.log('Refresh token stored:', refresh_token);
+      const decodedToken = decodeJWT(token);
+      const userInfo = decodedToken;
 
-      setUser(userData);
+      // Store token in localStorage
+      localStorage.setItem(
+        process.env.REACT_APP_AUTH_TOKEN_KEY || 'access_token',
+        token
+      );
+
+      // Store teacher_id
+      localStorage.setItem('teacherId', teacherId);
+      console.log('Stored teacherId:', teacherId);
+
+      setUser(userInfo);
       return { success: true };
     } catch (error) {
       console.log('Login error:', error);
@@ -98,12 +121,29 @@ export const AuthProvider = ({ children }) => {
       setError(null);
 
       const response = await apiService.post('/auth/register', userData);
-      const { accessToken, refreshToken, user: newUser } = response.data;
+      const { token, user: newUser } = response.data;
 
-      localStorage.setItem('access_token', accessToken);
-      localStorage.setItem('refresh_token', refreshToken);
+      // Decode JWT token to get user information if not provided
+      const decodeJWT = token => {
+        try {
+          const payload = token.split('.')[1];
+          const decodedPayload = JSON.parse(atob(payload));
+          return decodedPayload;
+        } catch (error) {
+          console.error('Error decoding JWT:', error);
+          return null;
+        }
+      };
 
-      setUser(newUser);
+      const decodedToken = decodeJWT(token);
+      const userInfo = newUser || decodedToken;
+
+      localStorage.setItem(
+        process.env.REACT_APP_AUTH_TOKEN_KEY || 'access_token',
+        token
+      );
+
+      setUser(userInfo);
       return { success: true };
     } catch (error) {
       setError(error.response?.data?.message || 'Registration failed');

@@ -34,10 +34,17 @@ export const loginSchema = z.object({
 
 export const registerSchema = z
   .object({
-    name: nameSchema,
+    username: z
+      .string()
+      .min(3, 'Username must be at least 3 characters')
+      .max(50, 'Username must be less than 50 characters'),
     email: emailSchema,
+    firstName: nameSchema,
+    lastName: nameSchema,
+    teacherId: z.string().min(1, 'Teacher ID is required'),
     password: passwordSchema,
     confirmPassword: z.string(),
+    role: z.string().min(1, 'Role is required'),
   })
   .refine(data => data.password === data.confirmPassword, {
     message: "Passwords don't match",

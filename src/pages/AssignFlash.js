@@ -17,30 +17,35 @@ export default function AssignFlash() {
   const [selectedSection, setSelectedSection] = useState('');
   const [students, setStudents] = useState([]);
   const [sections, setSections] = useState([]);
-  // const [isLoadingStudents, setIsLoadingStudents] = useState(false); // Removed unused
-  // const [isLoadingSections, setIsLoadingSections] = useState(false); // Removed unused
+  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+  const [isLoadingSections, setIsLoadingSections] = useState(false);
   const [flashData, setFlashData] = useState(null);
   // const [apiResponse, setApiResponse] = useState(null); // Removed unused
   const [isSubmitting, setIsSubmitting] = useState(false);
   // const [isApiLoading, setIsApiLoading] = useState(true); // Removed unused
 
-  // Fetch students & sections
+  // Fetch assignables (students & sections)
   useEffect(() => {
-    // setIsApiLoading(true); // Removed unused
-    fetch('http://127.0.0.1:8000/api/students_sections/')
-      .then(res => res.json())
-      .then(data => {
-        // setApiResponse(data); // Removed unused
-        if (Array.isArray(data.students)) setStudents(data.students);
-        if (Array.isArray(data.sections)) {
-          setSections(data.sections.map(s => ({ id: s, name: s })));
+    const fetchAssignables = async () => {
+      setIsLoadingStudents(true);
+      setIsLoadingSections(true);
+      try {
+        const response = await apiService.get('/assignables');
+        const data = response.data;
+        if (Array.isArray(data.users)) setStudents(data.users);
+        if (Array.isArray(data.users)) {
+          const uniqueSections = [...new Set(data.users.map(u => u.section))];
+          setSections(uniqueSections.map(s => ({ id: s, name: s })));
         }
-        // setIsApiLoading(false); // Removed unused
-      })
-      .catch(err => {
-        // setApiResponse({ error: err.message }); // Removed unused
-        // setIsApiLoading(false); // Removed unused
-      });
+      } catch (err) {
+        console.error('Failed to fetch assignables:', err);
+        toast.error('Failed to load students and sections.');
+      } finally {
+        setIsLoadingStudents(false);
+        setIsLoadingSections(false);
+      }
+    };
+    fetchAssignables();
   }, []);
 
   // Load flash data
@@ -86,16 +91,32 @@ export default function AssignFlash() {
         return;
       }
 
+      // Get teacherId from storage
+      const teacherId =
+        localStorage.getItem('teacherId') ||
+        sessionStorage.getItem('teacherId');
+
+      console.log('Retrieved teacherId:', teacherId);
+
+      if (!teacherId) {
+        toast.error('Teacher ID not found. Please login again.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Validate assignment mode and target (optional - no longer required)
+      // Removed validation to make assignment optional
+
       const assignmentCalls = flashData.items.map(async item => {
         const payload = {
-          concept: item.concept,
-          length_of_question: item.length || 1,
-          number_of_questions: item.questions || 1,
+          complexity: item.concept,
+          length: parseInt(item.length) || 1,
+          numQuestions: item.questions || 1,
           speed: item.time || 30,
-          assign_type: assignMode,
-          ...(assignMode === 'individual'
-            ? { target_student: selectedStudent }
-            : { target_class_section: selectedSection }),
+          title: title || 'Untitled Activity',
+          teacherId: teacherId,
+          ...(selectedStudent ? { userId: selectedStudent } : {}),
+          ...(selectedSection ? { section: selectedSection } : {}),
         };
 
         try {
@@ -213,17 +234,22 @@ export default function AssignFlash() {
               <div className="mt-2 sm:mt-4 w-full flex flex-col items-center">
                 <Select
                   options={students.map(s => ({
-                    value: s.username,
-                    label: s.username,
+                    value: s.id,
+                    label: s.name,
                   }))}
                   value={
                     selectedStudent
-                      ? { value: selectedStudent, label: selectedStudent }
+                      ? {
+                          value: selectedStudent,
+                          label: students.find(s => s.id === selectedStudent)
+                            ?.name,
+                        }
                       : null
                   }
                   onChange={opt => setSelectedStudent(opt?.value || '')}
-                  isLoading={false}
+                  isLoading={isLoadingStudents}
                   isClearable
+                  isSearchable={true}
                   placeholder="Search & select student..."
                   className="w-full sm:w-[220px] md:w-[300px]"
                 />
@@ -270,8 +296,9 @@ export default function AssignFlash() {
                       : null
                   }
                   onChange={opt => setSelectedSection(opt?.value || '')}
-                  isLoading={false}
+                  isLoading={isLoadingSections}
                   isClearable
+                  isSearchable={true}
                   placeholder="Search & select section..."
                   className="w-full sm:w-[220px] md:w-[300px]"
                 />

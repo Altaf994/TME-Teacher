@@ -1,11 +1,11 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { questionsAPI } from '../utils/api';
 import flashNumberIcon from '../assets/images/Flashnumber.png';
 import logoutIcon from '../assets/images/Logout.png';
 import universityIcon from '../assets/images/university.png';
 import studentIcon from '../assets/images/student-male.png';
-import { apiService } from '../utils/api';
 
 function Stepper({
   value,
@@ -54,8 +54,9 @@ export default function FlashNumberGame() {
   const navigate = useNavigate();
 
   const [concepts, setConcepts] = useState([]);
+  const [lengths, setLengths] = useState([]);
   const [selectedConcept, setSelectedConcept] = useState('');
-  const [questionLength, setQuestionLength] = useState(6);
+  const [questionLength, setQuestionLength] = useState('');
   const [numQuestions, setNumQuestions] = useState(10);
   const [speedSeconds, setSpeedSeconds] = useState(1.2);
   const [items, setItems] = useState([]);
@@ -63,16 +64,28 @@ export default function FlashNumberGame() {
 
   // Remove API call and use hardcoded concepts
   useEffect(() => {
-    setIsLoadingConcepts(true);
-    const fallbackConcepts = [
-      { id: 1, name: 'Junior +4' },
-      { id: 2, name: 'Senior +4' },
-      { id: 3, name: 'Senior -4' },
-      { id: 4, name: 'Multiplication' },
-    ];
-    setConcepts(fallbackConcepts);
-    setSelectedConcept(fallbackConcepts[0].name);
-    setIsLoadingConcepts(false);
+    const fetchFilters = async () => {
+      try {
+        const filters = await questionsAPI.getQuestionFilters();
+        setConcepts(filters.complexities || []);
+        setLengths(filters.lengths || []);
+
+        // Set default values
+        if (filters.complexities && filters.complexities.length > 0) {
+          setSelectedConcept(filters.complexities[0]);
+        }
+        if (filters.lengths && filters.lengths.length > 0) {
+          setQuestionLength(filters.lengths[0]);
+        }
+      } catch (error) {
+        toast.error('Failed to load question filters');
+        console.error('Error fetching filters:', error);
+      } finally {
+        setIsLoadingConcepts(false);
+      }
+    };
+
+    fetchFilters();
   }, []);
 
   const totalQuestions = useMemo(
@@ -179,8 +192,8 @@ export default function FlashNumberGame() {
                       <option value="">Loading concepts...</option>
                     ) : concepts.length > 0 ? (
                       concepts.map(concept => (
-                        <option key={concept.id} value={concept.name}>
-                          {concept.name}
+                        <option key={concept} value={concept}>
+                          {concept}
                         </option>
                       ))
                     ) : (
@@ -195,14 +208,25 @@ export default function FlashNumberGame() {
                 <div className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 text-center sm:text-left">
                   Length of Question:
                 </div>
-                <div className="flex justify-center sm:justify-start">
-                  <Stepper
+                <div className="w-full">
+                  <select
                     value={questionLength}
-                    onChange={setQuestionLength}
-                    min={1}
-                    max={20}
-                    step={1}
-                  />
+                    onChange={e => setQuestionLength(e.target.value)}
+                    disabled={isLoadingConcepts}
+                    className="w-full h-10 sm:h-12 border-2 border-gray-300 rounded-md px-3 sm:px-4 text-sm sm:text-base md:text-lg font-semibold bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoadingConcepts ? (
+                      <option value="">Loading lengths...</option>
+                    ) : lengths.length > 0 ? (
+                      lengths.map(length => (
+                        <option key={length} value={length}>
+                          {length}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">No lengths available</option>
+                    )}
+                  </select>
                 </div>
               </div>
 

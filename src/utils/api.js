@@ -3,7 +3,7 @@ import { toast } from 'react-hot-toast';
 
 // Create axios instance
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000/api',
+  baseURL: process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api/v1',
   timeout: parseInt(process.env.REACT_APP_API_TIMEOUT) || 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -149,6 +149,16 @@ export const questionsAPI = {
     }
   },
 
+  getQuestionFilters: async () => {
+    try {
+      const response = await api.get('/question-filters');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching question filters:', error);
+      throw new Error('Failed to fetch question filters. Please try again.');
+    }
+  },
+
   getAvailableConcepts: async () => {
     try {
       // For now, we'll use a workaround to get concepts by trying different known values
@@ -200,6 +210,20 @@ export const questionsAPI = {
     } catch (error) {
       console.error('Error fetching available concepts:', error);
       throw new Error('Failed to fetch available concepts. Please try again.');
+    }
+  },
+};
+
+// Assignments API
+export const assignmentsAPI = {
+  createAssignment: async assignmentData => {
+    try {
+      console.log('Creating assignment with payload:', assignmentData);
+      const response = await api.post('/assignments/', assignmentData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating assignment:', error);
+      throw new Error('Failed to create assignment. Please try again.');
     }
   },
 };
